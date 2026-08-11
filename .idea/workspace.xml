@@ -7,10 +7,7 @@
     <option name="/Default/Housekeeping/FeatureSuggestion/FeatureSuggestionManager/DisabledSuggesters/=SwitchToGoToActionSuggester/@EntryIndexedValue" value="true" type="bool" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4954e06c-ba1d-46e5-809d-5c888fbed677" name="Changes" comment="cleaned main">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/diffusion.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/diffusion.cpp" afterDir="false" />
-    </list>
+    <list default="true" id="4954e06c-ba1d-46e5-809d-5c888fbed677" name="Changes" comment="create two room layout, plan on creating other layouts with more &quot;rooms&quot; for experimentation." />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -103,7 +100,7 @@
       <option name="presentableId" value="Default" />
       <updated>1786224040586</updated>
       <workItem from="1786224041945" duration="1313000" />
-      <workItem from="1786466653668" duration="186000" />
+      <workItem from="1786466653668" duration="861000" />
     </task>
     <task id="LOCAL-00001" summary="Initial setup of diffusion gas simulator">
       <option name="closed" value="true" />
@@ -129,7 +126,15 @@
       <option name="project" value="LOCAL" />
       <updated>1786225177145</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="create two room layout, plan on creating other layouts with more &quot;rooms&quot; for experimentation.">
+      <option name="closed" value="true" />
+      <created>1786466888086</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1786466888090</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -150,6 +155,7 @@
     <MESSAGE value="Initial commit" />
     <MESSAGE value="Initial setup of diffusion gas simulator" />
     <MESSAGE value="cleaned main" />
-    <option name="LAST_COMMIT_MESSAGE" value="cleaned main" />
+    <MESSAGE value="create two room layout, plan on creating other layouts with more &quot;rooms&quot; for experimentation." />
+    <option name="LAST_COMMIT_MESSAGE" value="create two room layout, plan on creating other layouts with more &quot;rooms&quot; for experimentation." />
   </component>
 </project>

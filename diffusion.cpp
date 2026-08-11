@@ -42,3 +42,33 @@ WallGrid makeTwoRoomLayout() {
     }
     return walls;
 }
+
+// Performs ONE diffusion timestep: reads from `current`, writes the result
+// into `next`. We need two separate grids because every cell's update
+// depends on its neighbors' OLD values -- if we updated `current` in place,
+// later cells in the loop would read already-updated neighbor values,
+// which would corrupt the physics.
+
+void diffuseStep(const Grid& current, const WallGrid& walls, Grid& next) {
+    double alpha = D * DT / (DX * DX); // the D*dt/dx^2 factor from the formula
+
+    for (int i = 0; i < GRID_SIZE; i++) {
+        for (int j = 0; j < GRID_SIZE; j++) {
+            // Wall cells never hold gas -- keep them pinned at 0 and skip
+            // the update entirely. They still matter to their open-air
+            // neighbors via neighborValue() above.
+            if (walls[i][j]) {
+                next[i][j] = 0.0;
+                continue;
+            }
+
+            double up    = neighborValue(current, walls, i, j, i - 1, j);
+            double down  = neighborValue(current, walls, i, j, i + 1, j);
+            double left  = neighborValue(current, walls, i, j, i, j - 1);
+            double right = neighborValue(current, walls, i, j, i, j + 1);
+
+            double laplacian = up + down + left + right - 4.0 * current[i][j];
+            next[i][j] = current[i][j] + alpha * laplacian;
+        }
+    }
+}
