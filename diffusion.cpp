@@ -26,4 +26,19 @@ using Grid = std::vector<std::vector<double>>;
 // which one holds concentration values and which holds room geometry.
 using WallGrid = std::vector<std::vector<bool>>;
 
+Grid makeEmptyGrid () {
+    return Grid(GRID_SIZE, std::vector<double>(GRID_SIZE, 0.0));
+}
 
+WallGrid makeTwoRoomLayout() {
+    int wallCol = GRID_SIZE / 2;          // the dividing wall's column
+    int doorStart = GRID_SIZE / 2 - 3;    // doorway is a small gap in the wall
+    int doorEnd   = GRID_SIZE / 2 + 3;
+    for (int i = 0; i < GRID_SIZE; i++) {
+        bool isDoorway = (i >= doorStart && i <= doorEnd);
+        if (!isDoorway) {
+            walls[i][wallCol] = true;
+        }
+    }
+    return walls;
+}
