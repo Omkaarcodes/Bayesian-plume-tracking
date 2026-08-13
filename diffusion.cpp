@@ -11,6 +11,7 @@
 #include <ctime>        // for formatting the current time as a string
 #include <sstream>
 #include <iomanip>      // for std::put_time
+#include <random>
 
 
 const int GRID_SIZE = 50;      // grid is GRID_SIZE x GRID_SIZE cells
@@ -24,6 +25,8 @@ const int LOG_EVERY = 15;      // only writes snapshot every N steps (keeps CSV 
 const int SOURCE_X = 35;       // where the source sits: in the kitchen
 const int SOURCE_Y = 38;       // (a stove-leak-style source, away from the doorway)
 const double SOURCE_RATE = 5.0; // how much concentration the source injects each step
+
+const double SENSOR_NOISE_STD = 0.15; // standard deviation of Gaussian noise added to sensor readings
 
 using Grid = std::vector<std::vector<double>>;
 
@@ -206,6 +209,28 @@ void writeWalls(const WallGrid& walls, const std::string& runDir) {
     }
 }
 
+void writeSensorPositions(const std::vector<Sensor>& sensors, const std::string& runDir) {
+    std::ofstream out(runDir + "/sensor_positions.csv");
+    out << "sensor_id,x,y\n";
+    for (const Sensor& s : sensors) {
+        out << s.id << "," << s.x << "," << s.y << "\n";
+    }
+}
+// Samples every sensor's TRUE concentration at its grid cell, adds Gaussian
+// noise (the sensor noise model : reading = true + N(0,
+// sigma^2)), and appends one row per sensor to sensors.csv for this
+// timestep.
+
+void sampleAndLogSensors(const Grid& current, const std::vector<Sensor>& sensors,
+                          int step, std::ofstream& out, std::mt19937& rng) {
+    std::normal_distribution<double> noise(0.0, SENSOR_NOISE_STD);
+
+    for (const Sensor& s : sensors) {
+        double trueConcentration = current[s.x][s.y];
+        double reading = trueConcentration + noise(rng);
+        out << step << "," << s.id << "," << trueConcentration << "," << reading << "\n";
+    }
+}
 int main() {
     // std::filesystem::create_directories makes the folder (and any parent
     // folders that don't exist yet, e.g. "data/" itself) in one call.
@@ -217,6 +242,13 @@ int main() {
     Grid next = makeEmptyGrid();
     WallGrid walls = makeHouseLayout();
     writeWalls(walls, runDir);
+    std::vector<Sensor> sensors = placeSensors();
+    writeSensorPositions(sensors, runDir);
+
+    std::mt19937 rng(std::random_device{}());
+    
+    std::ofstream sensorLog(runDir + "/sensors.csv");
+    sensorLog << "step,sensor_id,true_concentration,reading\n";
 
     for (int step = 0; step < NUM_STEPS; step++) {
         // Inject concentration at the source cell BEFORE diffusing, so the
@@ -226,10 +258,16 @@ int main() {
 
         diffuseStep(current, walls, next);
 
+
         // Swap: `next` becomes the new `current` for the following
         // iteration. std::swap just exchanges what the two variables point
         // to internally.
         std::swap(current, next);
+
+        // Sensors sample every step (not just every LOG_EVERY steps like
+        // the full-grid snapshots) since we want a fine-grained time series
+        // to detect exactly when the plume front reaches each sensor.
+        sampleAndLogSensors(current, sensors, step, sensorLog, rng);
 
         if (step % LOG_EVERY == 0) {
             writeSnapshot(current, step, runDir);
