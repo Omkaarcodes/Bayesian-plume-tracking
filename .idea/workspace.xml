@@ -10,12 +10,9 @@
     <option name="flavorId" value="CMakePlainProjectFlavor" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4954e06c-ba1d-46e5-809d-5c888fbed677" name="Changes" comment="added more complex environment and started adding simulated sensors to the environment. Added visualizer to produce gif showing the spread of gas in the simulated environment">
-      <change afterPath="$PROJECT_DIR$/bayesian_belief.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/path-planning.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sensors.py" afterDir="false" />
+    <list default="true" id="4954e06c-ba1d-46e5-809d-5c888fbed677" name="Changes" comment="started working on bayesian belief prediction of where the source is and a rudimentary apporach to get there using a*">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/diffusion.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/diffusion.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/bayesian_belief.py" beforeDir="false" afterPath="$PROJECT_DIR$/bayesian_belief.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -165,6 +162,7 @@
       <workItem from="1786479819660" duration="58000" />
       <workItem from="1786487321882" duration="1692000" />
       <workItem from="1786535239717" duration="11088000" />
+      <workItem from="1786648884085" duration="1756000" />
     </task>
     <task id="LOCAL-00001" summary="Initial setup of diffusion gas simulator">
       <option name="closed" value="true" />
@@ -230,7 +228,15 @@
       <option name="project" value="LOCAL" />
       <updated>1786487671630</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="started working on bayesian belief prediction of where the source is and a rudimentary apporach to get there using a*">
+      <option name="closed" value="true" />
+      <created>1786648955892</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1786648955892</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -256,6 +262,7 @@
     <MESSAGE value="added more complex environment and started adding simulated sensors to the environment. Added visualizer in python to produce gif file that shows the spread of the simulated gas." />
     <MESSAGE value="added more complex environment and started adding simulated sensors to the environment." />
     <MESSAGE value="added more complex environment and started adding simulated sensors to the environment. Added visualizer to produce gif showing the spread of gas in the simulated environment" />
-    <option name="LAST_COMMIT_MESSAGE" value="added more complex environment and started adding simulated sensors to the environment. Added visualizer to produce gif showing the spread of gas in the simulated environment" />
+    <MESSAGE value="started working on bayesian belief prediction of where the source is and a rudimentary apporach to get there using a*" />
+    <option name="LAST_COMMIT_MESSAGE" value="started working on bayesian belief prediction of where the source is and a rudimentary apporach to get there using a*" />
   </component>
 </project>

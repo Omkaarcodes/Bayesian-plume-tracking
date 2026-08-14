@@ -5,15 +5,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy.ma as ma
+from matplotlib.colors import LogNorm
+from scipy.optimize import least_squares
 
 SENSOR_NOISE_STD = 0.15
-L = 10.0     # falloff length scale, in grid cells
-K0 = 0.02    # amplitude growth rate per step -- calibrated so predicted
-# readings land near actual observed magnitudes late in the run
-# (room is sealed, so total gas mass grows ~linearly with time,
-# confirmed on Day 1 -- so we scale K linearly with step too,
-# rather than using one fixed K that assumes a steady state
-# this sealed room never actually reaches)
+L_INIT = 10.0    # initial guess for falloff length scale, refined by calibration
+K0_INIT = 0.02   # initial guess for amplitude growth rate, refined by calibration
 
 
 def resolve_run_dir(path):
@@ -33,14 +30,41 @@ def load_data(run_dir):
     return walls, sensor_pos, sensors
 
 
-def expected_reading(cand_x, cand_y, sx, sy, step):
+def calibrate_params(sensors, sensor_pos, walls):
+    """Fits (x0, y0, K0, L) by nonlinear least squares against every logged
+    sensor reading. x0, y0 are a byproduct MLE point-estimate of the source
+    location."""
+
+    merged = sensors.merge(sensor_pos, on="sensor_id")
+    step = merged["step"].to_numpy()
+    sx = merged["x"].to_numpy()
+    sy = merged["y"].to_numpy()
+    reading = merged["reading"].to_numpy()
+
+    n = walls.shape[0]
+
+    def residuals(params):
+        x0, y0, k0, l = params
+        dist = np.sqrt((sx - x0) ** 2 + (sy - y0) ** 2)
+        predicted = k0 * step * np.exp(-dist / l)
+        return predicted - reading
+
+    init = [n / 2, n / 2, K0_INIT, L_INIT]
+    bounds = ([0, 0, 1e-6, 1.0], [n, n, 10.0, n])
+    result = least_squares(residuals, init, bounds=bounds)
+
+    x0, y0, k0, l = result.x
+    return {"x0": x0, "y0": y0, "K0": k0, "L": l}
+
+
+def expected_reading(cand_x, cand_y, sx, sy, step, K0, L):
     dist = np.sqrt((cand_x - sx) ** 2 + (cand_y - sy) ** 2)
     K = K0 * step
     return K * np.exp(-dist / L)
 
 
-def bayes_update(belief, cand_x, cand_y, sx, sy, reading, step):
-    expected = expected_reading(cand_x, cand_y, sx, sy, step)
+def bayes_update(belief, cand_x, cand_y, sx, sy, reading, step, K0, L):
+    expected = expected_reading(cand_x, cand_y, sx, sy, step, K0, L)
     likelihood = np.exp(-0.5 * ((reading - expected) / SENSOR_NOISE_STD) ** 2)
     belief = belief * likelihood
     belief /= belief.sum()
@@ -55,6 +79,12 @@ def entropy(belief):
 def run_belief_tracking(run_dir):
     walls, sensor_pos, sensors = load_data(run_dir)
     n = walls.shape[0]
+
+    calib = calibrate_params(sensors, sensor_pos, walls)
+    K0, L = calib["K0"], calib["L"]
+    print(f"Calibrated: K0={K0:.5f}, L={L:.2f}  "
+          f"(MLE source estimate: ({calib['x0']:.1f}, {calib['y0']:.1f}))")
+
     cand_x, cand_y = np.meshgrid(np.arange(n), np.arange(n), indexing="ij")
     belief = np.where(walls == 1, 0.0, 1.0)
     belief /= belief.sum()
@@ -65,19 +95,31 @@ def run_belief_tracking(run_dir):
         for _, row in group.iterrows():
             sx = sensor_pos.loc[row.sensor_id, "x"]
             sy = sensor_pos.loc[row.sensor_id, "y"]
-            belief = bayes_update(belief, cand_x, cand_y, sx, sy, row.reading, step)
+            belief = bayes_update(belief, cand_x, cand_y, sx, sy, row.reading, step, K0, L)
         entropy_history.append((step, entropy(belief)))
-    return belief, entropy_history, walls, sensor_pos
+    return belief, entropy_history, walls, sensor_pos, calib
 
 
-def plot_results(belief, entropy_history, walls, sensor_pos, true_source=None):
+def plot_results(belief, entropy_history, walls, sensor_pos, calib, true_source=None):
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
 
     # --- Left: belief heatmap ---
     ax = axes[0]
-    im = ax.imshow(belief, cmap="viridis")
+
+    # Belief is usually extremely peaked after enough updates -- most cells
+    # underflow to exactly 0.0 from repeated multiplication, and the
+    # surviving nonzero cells can span 100+ orders of magnitude. A linear
+    # color scale makes everything except the single peak pixel look
+    # identical (near-black/purple). A log scale with a floor at max*1e-6
+    # (instead of the true, absurdly tiny minimum) shows real structure in
+    # the cells that still meaningfully compete with the peak.
+    peak_val = belief.max()
+    floor = peak_val * 1e-6
+    display = np.where(belief > floor, belief, np.nan)  # NaN -> transparent/blank, not "0 on log scale" (undefined)
+
+    im = ax.imshow(display, cmap="viridis", norm=LogNorm(vmin=floor, vmax=peak_val))
     cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label("probability source is at this cell")
+    cbar.set_label("probability source is at this cell (log scale)")
 
     wall_overlay = ma.masked_where(walls == 0, walls)
     ax.imshow(wall_overlay, cmap="Greys", vmin=0, vmax=1, alpha=0.8)
@@ -86,13 +128,16 @@ def plot_results(belief, entropy_history, walls, sensor_pos, true_source=None):
 
     peak = np.unravel_index(np.argmax(belief), belief.shape)
     ax.scatter([peak[1]], [peak[0]], c="yellow", marker="*", s=250,
-               edgecolors="black", label="belief's best guess", zorder=4)
+               edgecolors="black", label="Bayes filter peak", zorder=4)
+    ax.scatter([calib["y0"]], [calib["x0"]], c="orange", marker="D", s=80,
+               edgecolors="black", label="MLE estimate (batch fit)", zorder=4)
 
     if true_source:
         ax.scatter([true_source[1]], [true_source[0]], c="red", marker="x",
                    s=120, linewidths=2.5, label="true source", zorder=4)
         error = np.sqrt((peak[0] - true_source[0]) ** 2 + (peak[1] - true_source[1]) ** 2)
-        ax.set_xlabel(f"Localization error: {error:.1f} grid cells")
+        mle_error = np.sqrt((calib["x0"] - true_source[0]) ** 2 + (calib["y0"] - true_source[1]) ** 2)
+        ax.set_xlabel(f"Bayes filter error: {error:.1f} cells   |   MLE error: {mle_error:.1f} cells")
 
     ax.set_title("Where the agent thinks the leak is\n(brighter = more probable)")
     ax.legend(loc="upper left", fontsize=8, framealpha=0.9)
@@ -133,5 +178,5 @@ if __name__ == "__main__":
         print("Usage: python belief_update.py <run_folder_or_data_dir>")
         sys.exit(1)
     run_dir = resolve_run_dir(sys.argv[1])
-    belief, entropy_history, walls, sensor_pos = run_belief_tracking(run_dir)
-    plot_results(belief, entropy_history, walls, sensor_pos, true_source=(35, 38))
+    belief, entropy_history, walls, sensor_pos, calib = run_belief_tracking(run_dir)
+    plot_results(belief, entropy_history, walls, sensor_pos, calib, true_source=(35, 38))
