@@ -14,37 +14,33 @@
 #include <random>
 
 
-const int GRID_SIZE = 50;      // grid is GRID_SIZE x GRID_SIZE cells
-const double D = 1.0;          // diffusion coefficient
-const double DX = 1.0;         // spacing between grid cells
-const double DT = 0.2;         // time step size
-const int NUM_STEPS = 600;     // how many timesteps to simulate (longer, so gas has
-                                // time to reach the doorway and leak into the 2nd room)
-const int LOG_EVERY = 15;      // only writes snapshot every N steps (keeps CSV count manageable)
+const int GRID_SIZE = 50;
+const double D = 1.0;
+const double DX = 1.0;
+const double DT = 0.2;
+const int NUM_STEPS = 600;
 
-const int SOURCE_X = 35;       // where the source sits: in the kitchen
-const int SOURCE_Y = 38;       // (a stove-leak-style source, away from the doorway)
-const double SOURCE_RATE = 5.0; // how much concentration the source injects each step
+const int LOG_RATE = 15;
+
+const int SOURCE_X = 35;
+const int SOURCE_Y = 38;
+const double SOURCE_RATE = 5.0;
 
 const double SENSOR_NOISE_STD = 0.15; // standard deviation of Gaussian noise added to sensor readings
 
 using Grid = std::vector<std::vector<double>>;
 
-// A WallGrid marks which cells are solid interior walls (true = wall,
-// false = open air). Separate type from Grid so it's clear
-// which one holds concentration values and which holds room geometry.
+
 using WallGrid = std::vector<std::vector<bool>>;
 
-// A fixed sensor sitting at one grid cell. It doesn't need to remember its
-// own reading history as a field.
+
 struct Sensor {
     int id;
     int x;
     int y;
 };
 
-// Places one sensor in each room of the house, roughly centered, plus one
-// in the hallway.
+
 std::vector<Sensor> placeSensors() {
     return {
             {0, 12, 11},   // bedroom
@@ -63,8 +59,7 @@ WallGrid makeEmptyWalls() {
     return WallGrid(GRID_SIZE, std::vector<bool>(GRID_SIZE, false));
 }
 
-// Fills every cell in the specified range as wall.
-// Used to lay down straight wall segments -- outer walls, dividers, etc.
+
 void addWallSegment(WallGrid& walls, int iStart, int iEnd, int jStart, int jEnd) {
     for (int i = iStart; i <= iEnd; i++) {
         for (int j = jStart; j <= jEnd; j++) {
@@ -73,9 +68,7 @@ void addWallSegment(WallGrid& walls, int iStart, int iEnd, int jStart, int jEnd)
     }
 }
 
-// Clears a rectangular gap in a wall so two spaces connect. Same shape as
-// addWallSegment but sets false instead of true -- meant to be called AFTER
-// a wall segment, to carve a doorway out of it.
+// Clears a rectangular gap in a wall so two spaces connect.
 void addDoorway(WallGrid& walls, int iStart, int iEnd, int jStart, int jEnd) {
     for (int i = iStart; i <= iEnd; i++) {
         for (int j = jStart; j <= jEnd; j++) {
@@ -84,12 +77,7 @@ void addDoorway(WallGrid& walls, int iStart, int iEnd, int jStart, int jEnd) {
     }
 }
 
-// Builds a small house: a central hallway (columns 23-26) running north-south,
-// with four rooms opening off it -- bedroom and living room to the west,
-// bathroom and kitchen to the east -- plus a front door on the south wall
-// that opens directly onto the hallway. Every room connects to the world
-// only through its own doorway onto the hallway, the way an actual hallway-
-// plan house works, rather than rooms opening into each other directly.
+
 WallGrid makeHouseLayout() {
     WallGrid walls = makeEmptyWalls();
 
@@ -113,7 +101,6 @@ WallGrid makeHouseLayout() {
     addDoorway(walls, 33, 36, 27, 27);   // kitchen doorway
 
     // west rooms divider -- bedroom (north) vs living room (south); no
-    // direct doorway between them, they're only connected via the hallway
     addWallSegment(walls, 25, 25, 1, 21);
 
     // east rooms divider -- bathroom (north, smaller) vs kitchen (south)
@@ -123,12 +110,7 @@ WallGrid makeHouseLayout() {
 }
 
 
-// Returns the concentration value to use for neighbor (ni, nj) when updating
-// cell (i, j). Implements a REFLECTING (no-flux) boundary: if the neighbor
-// is a wall or off the edge of the grid, gas can't pass through it, so we
-// treat it as if it mirrors the current cell's own value. That keeps the
-// gradient (and therefore flux) across that face at zero -- physically,
-// "nothing crosses a solid boundary".
+
 double neighborValue(const Grid& current, const WallGrid& walls,
                       int i, int j, int ni, int nj) {
     bool outOfBounds = (ni < 0 || ni >= GRID_SIZE || nj < 0 || nj >= GRID_SIZE);
@@ -138,19 +120,14 @@ double neighborValue(const Grid& current, const WallGrid& walls,
     return current[ni][nj];
 }
 
-// Performs ONE diffusion timestep: reads from `current`, writes the result
-// into `next`. We need two separate grids because every cell's update
-// depends on its neighbors' OLD values -- if we updated `current` in place,
-// later cells in the loop would read already-updated neighbor values,
-// which would corrupt the physics.
+
 void diffuseStep(const Grid& current, const WallGrid& walls, Grid& next) {
     double alpha = D * DT / (DX * DX); // the D*dt/dx^2 factor from the formula
 
     for (int i = 0; i < GRID_SIZE; i++) {
         for (int j = 0; j < GRID_SIZE; j++) {
             // Wall cells never hold gas -- keep them pinned at 0 and skip
-            // the update entirely. They still matter to their open-air
-            // neighbors via neighborValue() above.
+            // the update entirely.
             if (walls[i][j]) {
                 next[i][j] = 0.0;
                 continue;
@@ -167,8 +144,7 @@ void diffuseStep(const Grid& current, const WallGrid& walls, Grid& next) {
     }
 }
 
-// Builds a folder name like "data/run_2026-08-11_14-32-01" from the current
-// wall-clock time.
+
 std::string makeRunFolderName() {
     auto now = std::chrono::system_clock::now();
     std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
@@ -179,9 +155,7 @@ std::string makeRunFolderName() {
     return oss.str();
 }
 
-// Writes one grid snapshot to a CSV file: one row per grid row, comma-separated.
-// `step` is included in the filename so each snapshot gets its own file --
-// simplest possible approach for now, easy to load in Python later.
+
 void writeSnapshot(const Grid& grid, int step, const std::string& runDir) {
     std::string filename = runDir + "/snapshot_" + std::to_string(step) + ".csv";
     std::ofstream out(filename);
@@ -196,8 +170,7 @@ void writeSnapshot(const Grid& grid, int step, const std::string& runDir) {
     out.close();
 }
 
-// Writes the wall layout to its own CSV file, so we can visualize the house geometry in Python later.
-// (Now written inside runDir so it stays grouped with the snapshots from the same run.)
+
 void writeWalls(const WallGrid& walls, const std::string& runDir) {
     std::ofstream out(runDir + "/walls.csv");
     for (int i = 0; i < GRID_SIZE; i++) {
@@ -216,10 +189,8 @@ void writeSensorPositions(const std::vector<Sensor>& sensors, const std::string&
         out << s.id << "," << s.x << "," << s.y << "\n";
     }
 }
-// Samples every sensor's TRUE concentration at its grid cell, adds Gaussian
-// noise (the sensor noise model : reading = true + N(0,
-// sigma^2)), and appends one row per sensor to sensors.csv for this
-// timestep.
+// Samples every sensor's true concentration at its grid cell, adds Gaussian
+// noise.
 
 void sampleAndLogSensors(const Grid& current, const std::vector<Sensor>& sensors,
                           int step, std::ofstream& out, std::mt19937& rng) {
@@ -232,8 +203,7 @@ void sampleAndLogSensors(const Grid& current, const std::vector<Sensor>& sensors
     }
 }
 int main() {
-    // std::filesystem::create_directories makes the folder (and any parent
-    // folders that don't exist yet, e.g. "data/" itself) in one call.
+
     std::string runDir = makeRunFolderName();
     std::filesystem::create_directories(runDir);
     std::cout << "Writing this run's output to " << runDir << "\n";
@@ -251,30 +221,21 @@ int main() {
     sensorLog << "step,sensor_id,true_concentration,reading\n";
 
     for (int step = 0; step < NUM_STEPS; step++) {
-        // Inject concentration at the source cell BEFORE diffusing, so the
-        // source keeps "topping up" concentration each step rather than
-        // just diffusing away a single initial pulse.
+        // Inject concentration at the source cell before diffusing.
         current[SOURCE_X][SOURCE_Y] += SOURCE_RATE;
 
         diffuseStep(current, walls, next);
 
-
-        // Swap: `next` becomes the new `current` for the following
-        // iteration. std::swap just exchanges what the two variables point
-        // to internally.
         std::swap(current, next);
 
-        // Sensors sample every step (not just every LOG_EVERY steps like
-        // the full-grid snapshots) since we want a fine-grained time series
-        // to detect exactly when the plume front reaches each sensor.
         sampleAndLogSensors(current, sensors, step, sensorLog, rng);
 
-        if (step % LOG_EVERY == 0) {
+        if (step % LOG_RATE == 0) {
             writeSnapshot(current, step, runDir);
             std::cout << "Logged step " << step << "\n";
         }
     }
 
-    std::cout << "Done. " << (NUM_STEPS / LOG_EVERY) << " snapshots written to " << runDir << "/\n";
+    std::cout << "Done. " << (NUM_STEPS / LOG_RATE) << " snapshots written to " << runDir << "/\n";
     return 0;
 }

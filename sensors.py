@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-ROOM_NAMES = {
+ROOMS = {
     0: "bedroom",
     1: "living room",
     2: "bathroom",

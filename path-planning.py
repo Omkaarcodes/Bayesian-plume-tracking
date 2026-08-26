@@ -8,7 +8,7 @@ import numpy.ma as ma
 
 from bayesian_belief import load_data, run_belief_tracking
 
-START = (48, 24)  # just inside the front door
+START = (48, 24)
 
 
 def resolve_run_dir(path):
@@ -22,8 +22,7 @@ def resolve_run_dir(path):
 
 
 def heuristic(a, b):
-    return abs(a[0] - b[0]) + abs(a[1] - b[1])  # Manhattan distance
-
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
 def neighbors(pos, walls):
     x, y = pos
@@ -58,8 +57,7 @@ def astar(walls, start, goal):
                 f = tentative_g + heuristic(nxt, goal)
                 heapq.heappush(open_set, (f, tentative_g, nxt))
 
-    return None  # no path found
-
+    return None
 
 def plot_path(walls, path, start, goal, true_source=None):
     fig, ax = plt.subplots(figsize=(6, 6))
@@ -93,8 +91,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     run_dir = resolve_run_dir(sys.argv[1])
-    walls, sensor_pos, sensors = load_data(run_dir)
-    belief, entropy_history, walls, sensor_pos = run_belief_tracking(run_dir)
+    belief, entropy_history, walls, sensor_pos, calib = run_belief_tracking(run_dir)
 
     goal = tuple(int(v) for v in np.unravel_index(np.argmax(belief), belief.shape))
     print(f"Target (belief peak): {goal}")

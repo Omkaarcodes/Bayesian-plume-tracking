@@ -9,8 +9,8 @@ from matplotlib.colors import LogNorm
 from scipy.optimize import least_squares
 
 SENSOR_NOISE_STD = 0.15
-L_INIT = 10.0    # initial guess for falloff length scale, refined by calibration
-K0_INIT = 0.02   # initial guess for amplitude growth rate, refined by calibration
+L_INIT = 10.0
+K0_INIT = 0.02
 
 
 def resolve_run_dir(path):
@@ -23,7 +23,7 @@ def resolve_run_dir(path):
     return max(run_folders, key=os.path.getmtime)
 
 
-def load_data(run_dir):
+def load(run_dir):
     walls = np.loadtxt(f"{run_dir}/walls.csv", delimiter=",")
     sensor_pos = pd.read_csv(f"{run_dir}/sensor_positions.csv").set_index("sensor_id")
     sensors = pd.read_csv(f"{run_dir}/sensors.csv")
@@ -57,7 +57,7 @@ def calibrate_params(sensors, sensor_pos, walls):
     return {"x0": x0, "y0": y0, "K0": k0, "L": l}
 
 
-def expected_reading(cand_x, cand_y, sx, sy, step, K0, L):
+def exp_reading(cand_x, cand_y, sx, sy, step, K0, L):
     dist = np.sqrt((cand_x - sx) ** 2 + (cand_y - sy) ** 2)
     K = K0 * step
     return K * np.exp(-dist / L)
@@ -76,7 +76,7 @@ def entropy(belief):
     return -np.sum(p * np.log(p))
 
 
-def run_belief_tracking(run_dir):
+def belief_tracking(run_dir):
     walls, sensor_pos, sensors = load_data(run_dir)
     n = walls.shape[0]
 
@@ -103,16 +103,7 @@ def run_belief_tracking(run_dir):
 def plot_results(belief, entropy_history, walls, sensor_pos, calib, true_source=None):
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
 
-    # --- Left: belief heatmap ---
     ax = axes[0]
-
-    # Belief is usually extremely peaked after enough updates -- most cells
-    # underflow to exactly 0.0 from repeated multiplication, and the
-    # surviving nonzero cells can span 100+ orders of magnitude. A linear
-    # color scale makes everything except the single peak pixel look
-    # identical (near-black/purple). A log scale with a floor at max*1e-6
-    # (instead of the true, absurdly tiny minimum) shows real structure in
-    # the cells that still meaningfully compete with the peak.
     peak_val = belief.max()
     floor = peak_val * 1e-6
     display = np.where(belief > floor, belief, np.nan)  # NaN -> transparent/blank, not "0 on log scale" (undefined)
@@ -142,7 +133,6 @@ def plot_results(belief, entropy_history, walls, sensor_pos, calib, true_source=
     ax.set_title("Where the agent thinks the leak is\n(brighter = more probable)")
     ax.legend(loc="upper left", fontsize=8, framealpha=0.9)
 
-    # --- Right: entropy over time ---
     steps, ent_nats = zip(*entropy_history)
     ent_bits = np.array(ent_nats) / np.log(2)  # convert nats -> bits, more intuitive
 
